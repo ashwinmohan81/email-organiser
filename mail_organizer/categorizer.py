@@ -19,10 +19,12 @@ Categories:
 - Promotions: marketing emails, sales, coupons, product launches, deals
 - Spam: unwanted junk, phishing attempts, scams, unsolicited bulk email
 
-For each email, respond with a JSON array. Each element must have:
+Return a JSON object with key "results" containing an array. Each element must have:
 - "id": the email ID (string)
 - "category": one of "Action Required", "Important", "FYI", "Newsletter", "Social", "Promotions", "Spam"
 - "reason": a brief reason for the classification (max 10 words)
+
+Example: {"results": [{"id": "1", "category": "Action Required", "reason": "Needs approval"}]}
 
 Respond ONLY with valid JSON. No markdown, no explanation."""
 
@@ -46,13 +48,28 @@ def _parse_ai_response(raw: str, emails: list[Email]) -> dict[str, tuple[Categor
         cleaned = re.sub(r"\s*```$", "", cleaned)
 
     try:
-        items = json.loads(cleaned)
+        parsed = json.loads(cleaned)
     except json.JSONDecodeError:
+        return {}
+
+    # Handle both bare arrays and wrapped objects like {"emails": [...]}
+    if isinstance(parsed, list):
+        items = parsed
+    elif isinstance(parsed, dict):
+        for v in parsed.values():
+            if isinstance(v, list):
+                items = v
+                break
+        else:
+            items = [parsed]
+    else:
         return {}
 
     cat_map = {c.value: c for c in Category}
     result = {}
     for item in items:
+        if not isinstance(item, dict):
+            continue
         eid = item.get("id", "")
         cat_str = item.get("category", "")
         reason = item.get("reason", "")
@@ -93,7 +110,7 @@ def categorize_with_gemini(
 
 
 def categorize_with_ollama(
-    emails: list[Email], model_name: str = "llama3.2"
+    emails: list[Email], model_name: str = "mistral"
 ) -> list[CategorizedEmail]:
     import ollama
 
@@ -107,7 +124,9 @@ def categorize_with_ollama(
         options={"temperature": 0.1},
     )
 
-    mapping = _parse_ai_response(response["response"], emails)
+    raw = response.response if hasattr(response, "response") else response.get("response", "")
+
+    mapping = _parse_ai_response(raw, emails)
     return [
         CategorizedEmail(
             email=e,
@@ -180,7 +199,7 @@ def categorize(
     emails: list[Email],
     backend: str = "rules",
     gemini_api_key: str = "",
-    ollama_model: str = "llama3.2",
+    ollama_model: str = "mistral",
 ) -> list[CategorizedEmail]:
     if not emails:
         return []

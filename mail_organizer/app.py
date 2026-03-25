@@ -639,9 +639,9 @@ with st.sidebar:
     )
     backend_key = "gemini" if "Gemini" in backend else ("ollama" if "Ollama" in backend else "rules")
 
-    ollama_model = "llama3.2"
+    ollama_model = "mistral"
     if backend_key == "ollama":
-        ollama_model = st.text_input("Ollama model", value="llama3.2")
+        ollama_model = st.text_input("Ollama model", value="mistral")
     if backend_key == "gemini" and not os.getenv("GEMINI_API_KEY", ""):
         st.warning("Set GEMINI_API_KEY in .env", icon="⚠️")
 
