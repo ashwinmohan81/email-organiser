@@ -83,10 +83,15 @@ button, input, select, textarea {
                  'Segoe UI', Roboto, sans-serif !important;
 }
 
-/* ---- Hide Streamlit chrome ---- */
-#MainMenu, header, footer, .stDeployButton,
+/* Hide Streamlit chrome but KEEP sidebar toggle visible */
+#MainMenu, footer, .stDeployButton,
 [data-testid="stToolbar"], [data-testid="stDecoration"],
 [data-testid="stStatusWidget"] { display: none !important; }
+
+/* Hide header — sidebar is always visible, no toggle needed */
+header[data-testid="stHeader"] {
+    display: none !important;
+}
 
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; }
@@ -96,211 +101,187 @@ button, input, select, textarea {
 
 /* ---- Sidebar ---- */
 section[data-testid="stSidebar"] {
-    background: #0B0E14 !important;
-    border-right: 1px solid var(--border) !important;
+    background: #0A0D12 !important;
+    border-right: 1px solid rgba(255,255,255,0.05) !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    overflow-x: hidden !important;
+    transform: none !important;
+    transition: none !important;
 }
 section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
-    padding-top: 1.5rem;
+    padding: 1.2rem 1rem 1rem;
+    overflow-x: hidden !important;
+}
+/* Hide sidebar collapse/expand buttons — sidebar always visible */
+button[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+section[data-testid="stSidebar"] button[kind="header"] {
+    display: none !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    font-size: 0.78rem !important;
+    min-height: 36px !important;
+}
+section[data-testid="stSidebar"] .stRadio > div {
+    gap: 2px !important;
+}
+section[data-testid="stSidebar"] .stRadio label {
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    transition: background 0.15s !important;
+}
+section[data-testid="stSidebar"] .stRadio label:hover {
+    background: rgba(255,255,255,0.04) !important;
+}
+section[data-testid="stSidebar"] .stSelectbox > div > div {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
 }
 
-.sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 0 20px 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
+/* Sidebar brand */
+.sb-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 4px 0 18px; margin-bottom: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.sidebar-brand-icon {
-    width: 36px; height: 36px;
+.sb-brand-icon {
+    width: 34px; height: 34px;
     background: linear-gradient(135deg, #4A90D9, #67B8F7);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+    font-size: 17px; flex-shrink: 0;
 }
-.sidebar-brand-text {
-    font-size: 1.15rem;
-    font-weight: 700;
+.sb-brand-text {
+    font-size: 1.05rem; font-weight: 700;
     background: linear-gradient(135deg, #4A90D9, #67B8F7);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     letter-spacing: -0.3px;
 }
 
-.sidebar-section-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-muted);
-    margin: 20px 0 8px 0;
+/* Sidebar account card */
+.sb-account {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; margin: 6px 0 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
 }
-
-.sidebar-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 20px 0;
-}
-
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    padding: 6px 10px;
-    background: var(--bg-card);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    margin-top: 4px;
-}
-.status-badge .dot {
-    width: 7px; height: 7px;
+.sb-account-avatar {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #27AE60, #2ECC71);
     border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.75rem; color: #fff;
     flex-shrink: 0;
 }
-.status-badge .dot.on  { background: var(--success); box-shadow: 0 0 6px rgba(39,174,96,0.5); }
-.status-badge .dot.off { background: var(--danger); }
+.sb-account-info {
+    flex: 1; min-width: 0;
+}
+.sb-account-info .name {
+    font-size: 0.8rem; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sb-account-info .status {
+    font-size: 0.68rem; color: var(--success);
+    display: flex; align-items: center; gap: 4px;
+}
+.sb-account-info .status::before {
+    content: ''; width: 6px; height: 6px;
+    background: var(--success); border-radius: 50%;
+    box-shadow: 0 0 6px rgba(39,174,96,0.5);
+}
+
+/* Sidebar section labels */
+.sb-label {
+    font-size: 0.62rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+    margin: 18px 0 6px 2px;
+}
+.sb-divider {
+    height: 1px; background: rgba(255,255,255,0.05); margin: 16px 0;
+}
 
 /* ---- Welcome / empty state ---- */
 .hero {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 100px 24px 60px;
-    text-align: center;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 80px 24px 40px; text-align: center;
 }
 .hero-icon {
-    width: 80px; height: 80px;
+    width: 72px; height: 72px;
     background: linear-gradient(135deg, rgba(74,144,217,0.15), rgba(103,184,247,0.08));
-    border-radius: 24px;
+    border-radius: 20px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 36px;
-    margin-bottom: 24px;
+    font-size: 32px; margin-bottom: 20px;
     border: 1px solid rgba(74,144,217,0.2);
 }
 .hero h2 {
-    font-size: 1.6rem;
-    font-weight: 700;
+    font-size: 1.5rem; font-weight: 700;
     color: var(--text-primary);
-    margin: 0 0 8px;
-    letter-spacing: -0.3px;
+    margin: 0 0 8px; letter-spacing: -0.3px;
 }
 .hero p {
-    font-size: 0.95rem;
-    color: var(--text-muted);
-    max-width: 380px;
-    line-height: 1.65;
-    margin: 0;
+    font-size: 0.9rem; color: var(--text-muted);
+    max-width: 380px; line-height: 1.6; margin: 0;
 }
 
-/* ---- Category cards grid ---- */
-.cat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
+/* ---- Category card buttons ---- */
+div[data-testid="stVerticalBlock"] div[data-testid="stColumns"] .cat-btn-wrap .stButton > button {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 20px 16px !important;
+    min-height: 120px !important;
+    text-align: left !important;
+    transition: all 0.2s ease !important;
+    color: var(--text-primary) !important;
+    white-space: pre-wrap !important;
+    line-height: 1.5 !important;
+    font-size: 0.8rem !important;
 }
-.cat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px 20px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    position: relative;
-    overflow: hidden;
-}
-.cat-card:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-hover);
-    background: var(--bg-card-hover);
-}
-.cat-card .cat-icon {
-    font-size: 1.6rem;
-    margin-bottom: 12px;
-}
-.cat-card .cat-count {
-    font-size: 2.2rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -1px;
-    margin-bottom: 4px;
-}
-.cat-card .cat-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
-}
-.cat-card .cat-action {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-muted);
-}
-.cat-card .cat-stripe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
+div[data-testid="stVerticalBlock"] div[data-testid="stColumns"] .cat-btn-wrap .stButton > button:hover {
+    border-color: var(--border-hover) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-hover) !important;
+    background: var(--bg-card-hover) !important;
 }
 
 /* ---- Detail header ---- */
 .detail-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 18px; padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
 }
-.detail-header .dh-icon {
-    font-size: 1.4rem;
-}
+.detail-header .dh-icon { font-size: 1.3rem; }
 .detail-header .dh-title {
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 1.15rem; font-weight: 700; color: var(--text-primary);
 }
 .detail-header .dh-count {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    font-weight: 500;
+    font-size: 0.82rem; color: var(--text-muted); font-weight: 500;
 }
 .detail-header .dh-action-badge {
-    margin-left: auto;
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 4px 12px;
-    border-radius: 20px;
+    margin-left: auto; font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px;
+    padding: 4px 12px; border-radius: 20px;
 }
-
-/* ---- Hide tabs (not used) ---- */
 
 /* ---- Email list ---- */
 .email-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-bottom: 20px;
+    display: flex; flex-direction: column;
+    gap: 4px; margin-bottom: 16px;
 }
-
 .email-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    cursor: default;
     transition: all 0.15s ease;
 }
 .email-row:hover {
@@ -311,116 +292,59 @@ section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
     background: var(--bg-card-selected);
     border-color: var(--border-selected);
 }
-
 .email-avatar {
-    width: 38px; height: 38px;
-    border-radius: 12px;
+    width: 36px; height: 36px; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 0.85rem;
-    color: white;
-    flex-shrink: 0;
-    opacity: 0.9;
+    font-weight: 700; font-size: 0.82rem; color: white;
+    flex-shrink: 0; opacity: 0.9;
 }
-
 .email-body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 1px;
 }
 .email-from {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    font-weight: 600; font-size: 0.82rem; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
 }
 .email-from .addr {
-    font-weight: 400;
-    font-size: 0.75rem;
-    color: var(--text-muted);
+    font-weight: 400; font-size: 0.72rem; color: var(--text-muted);
 }
 .email-subj {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.8rem; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .email-snip {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.72rem; color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
 .email-right {
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    min-width: 90px;
+    flex-shrink: 0; display: flex; flex-direction: column;
+    align-items: flex-end; gap: 4px; min-width: 80px;
 }
 .email-time {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    font-weight: 500;
+    font-size: 0.7rem; color: var(--text-muted); font-weight: 500;
 }
 .email-tag {
-    font-size: 0.65rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 20px;
+    font-size: 0.62rem; font-weight: 600;
+    padding: 2px 7px; border-radius: 20px;
     background: rgba(74, 144, 217, 0.1);
     color: var(--accent-light);
-    white-space: nowrap;
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* ---- Action toolbar ---- */
-.toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 12px;
-}
-.toolbar-count {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-.toolbar-sep {
-    width: 1px;
-    height: 20px;
-    background: var(--border);
+    white-space: nowrap; max-width: 140px;
+    overflow: hidden; text-overflow: ellipsis;
 }
 
 /* ---- Confirm banner ---- */
 .confirm-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
     background: var(--danger-bg);
     border: 1px solid rgba(231, 76, 60, 0.2);
     border-radius: var(--radius-sm);
-    margin: 12px 0;
+    margin: 10px 0;
 }
-.confirm-banner .icon { font-size: 1.2rem; }
+.confirm-banner .icon { font-size: 1.1rem; }
 .confirm-banner .msg {
-    flex: 1;
-    font-size: 0.85rem;
-    color: #F1C0B9;
+    flex: 1; font-size: 0.82rem; color: #F1C0B9;
 }
 
 /* ---- Button overrides ---- */
@@ -435,36 +359,26 @@ section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
     transform: translateY(-1px) !important;
     box-shadow: var(--shadow-hover) !important;
 }
-
-/* Primary button */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #4A90D9, #3A7BC8) !important;
-    border: none !important;
-    color: white !important;
+    border: none !important; color: white !important;
 }
 .stButton > button[kind="primary"]:hover {
     background: linear-gradient(135deg, #5A9FE8, #4A8BD8) !important;
 }
 
-/* ---- Checkbox style overrides ---- */
-.stCheckbox {
-    padding: 0 !important;
-}
+/* ---- Checkbox ---- */
+.stCheckbox { padding: 0 !important; }
 .stCheckbox label {
-    padding: 0 !important;
-    min-height: 0 !important;
-    align-items: center !important;
-    gap: 6px !important;
+    padding: 0 !important; min-height: 0 !important;
+    align-items: center !important; gap: 6px !important;
 }
 .stCheckbox label span[data-testid="stCheckboxLabel"] {
-    font-size: 0.82rem !important;
-    font-weight: 500 !important;
+    font-size: 0.82rem !important; font-weight: 500 !important;
 }
 
-/* ---- Selectbox / slider / input overrides ---- */
-.stSelectbox, .stSlider, .stTextInput {
-    margin-bottom: 4px;
-}
+/* ---- Form inputs ---- */
+.stSelectbox, .stSlider, .stTextInput { margin-bottom: 4px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -533,24 +447,6 @@ def _render_email_list(emails: list[CategorizedEmail], selected_set: set[str]) -
     return f'<div class="email-list">{"".join(rows)}</div>'
 
 
-def _render_metrics(categorized: list[CategorizedEmail], cat_order: list[str]) -> str:
-    counts: dict[str, int] = {}
-    for ce in categorized:
-        counts[ce.category] = counts.get(ce.category, 0) + 1
-
-    cards = []
-    for i, cat in enumerate(cat_order):
-        n = counts.get(cat, 0)
-        color, icon = get_category_style(cat, i)
-        cards.append(f"""
-        <div class="metric">
-            <div class="metric-num" style="color:{color};">{n}</div>
-            <div class="metric-name">{icon} {_esc(cat)}</div>
-        </div>""")
-
-    return f'<div class="metrics">{"".join(cards)}</div>'
-
-
 # ---------------------------------------------------------------------------
 # Selection helpers — proper session_state management
 # ---------------------------------------------------------------------------
@@ -611,64 +507,86 @@ if "active_category" not in st.session_state:
 # Sidebar
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("""
-    <div class="sidebar-brand">
-        <div class="sidebar-brand-icon">📬</div>
-        <div class="sidebar-brand-text">Mail Organizer</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Brand ──
+    st.markdown(
+        '<div class="sb-brand">'
+        '<div class="sb-brand-icon">📬</div>'
+        '<div class="sb-brand-text">Mail Organizer</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-    # -- Account --
-    st.markdown('<div class="sidebar-section-label">Account</div>', unsafe_allow_html=True)
+    # ── Account ──
     accounts = st.session_state.accounts
 
     if accounts:
-        selected = st.selectbox(
-            "Gmail Account",
-            accounts,
-            index=(accounts.index(st.session_state.active_account)
-                   if st.session_state.active_account in accounts else 0),
-            label_visibility="collapsed",
-        )
-        st.session_state.active_account = selected
+        if len(accounts) > 1:
+            selected = st.selectbox(
+                "Account",
+                accounts,
+                index=(accounts.index(st.session_state.active_account)
+                       if st.session_state.active_account in accounts else 0),
+                label_visibility="collapsed",
+            )
+            st.session_state.active_account = selected
+        acct = st.session_state.active_account or ""
+        initial = acct[0].upper() if acct else "?"
         st.markdown(
-            f'<div class="status-badge"><span class="dot on"></span>{selected}</div>',
+            f'<div class="sb-account">'
+            f'<div class="sb-account-avatar">{_esc(initial)}</div>'
+            f'<div class="sb-account-info">'
+            f'<div class="name">{_esc(acct)}</div>'
+            f'<div class="status">Connected</div>'
+            f'</div></div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div class="status-badge"><span class="dot off"></span>No accounts</div>',
+            '<div class="sb-account">'
+            '<div class="sb-account-avatar" style="background:#555;">?</div>'
+            '<div class="sb-account-info">'
+            '<div class="name" style="color:var(--text-muted);">No account</div>'
+            '<div class="status" style="color:var(--danger);">Not connected</div>'
+            '</div></div>',
             unsafe_allow_html=True,
         )
 
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("Add Account", use_container_width=True, icon="➕"):
-            try:
-                email = add_account()
-                if email:
-                    st.session_state.accounts = list_accounts()
-                    st.session_state.active_account = email
-                    st.rerun()
-            except FileNotFoundError as exc:
-                st.error(str(exc))
-            except Exception as exc:
-                st.error(f"Auth failed: {exc}")
-    with c2:
-        if accounts and st.button("Remove", use_container_width=True, icon="🗑️"):
-            if st.session_state.active_account:
-                remove_account(st.session_state.active_account)
+    if st.button("Add Account", use_container_width=True, icon="➕"):
+        try:
+            email = add_account()
+            if email:
                 st.session_state.accounts = list_accounts()
-                st.session_state.active_account = (
-                    st.session_state.accounts[0] if st.session_state.accounts else None
-                )
-                st.session_state.categorized = []
+                st.session_state.active_account = email
                 st.rerun()
+        except FileNotFoundError as exc:
+            st.error(str(exc))
+        except Exception as exc:
+            st.error(f"Auth failed: {exc}")
+    if accounts and st.button("Remove Account", use_container_width=True, icon="🗑️"):
+        if st.session_state.active_account:
+            remove_account(st.session_state.active_account)
+            st.session_state.accounts = list_accounts()
+            st.session_state.active_account = (
+                st.session_state.accounts[0] if st.session_state.accounts else None
+            )
+            st.session_state.categorized = []
+            st.rerun()
 
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
 
-    # -- AI Engine --
-    st.markdown('<div class="sidebar-section-label">AI Engine</div>', unsafe_allow_html=True)
+    # ── Scan button (prominent, like Gmail Compose) ──
+    sidebar_scan = st.button(
+        "Scan Inbox",
+        use_container_width=True,
+        type="primary",
+        disabled=not st.session_state.active_account,
+        icon="🔍",
+    )
+
+    st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
+
+    # ── AI Engine ──
+    st.markdown('<div class="sb-label">AI Engine</div>', unsafe_allow_html=True)
     backend = st.radio(
         "Backend",
         ["✨ Gemini (Cloud)", "🔒 Ollama (Local)", "⚡ Rules Only"],
@@ -683,28 +601,20 @@ with st.sidebar:
     if backend_key == "gemini" and not os.getenv("GEMINI_API_KEY", ""):
         st.warning("Set GEMINI_API_KEY in .env", icon="⚠️")
 
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="sb-divider"></div>', unsafe_allow_html=True)
 
-    # -- Search --
-    st.markdown('<div class="sidebar-section-label">Search</div>', unsafe_allow_html=True)
-    query = st.text_input("Gmail search query", value=DEFAULT_QUERY, label_visibility="collapsed",
+    # ── Search settings ──
+    st.markdown('<div class="sb-label">Search</div>', unsafe_allow_html=True)
+    query = st.text_input("Gmail query", value=DEFAULT_QUERY, label_visibility="collapsed",
                           placeholder="is:inbox")
     max_results = st.slider("Emails to fetch", 10, 200, DEFAULT_MAX_RESULTS, step=10)
-
-    st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
-
-    scan_clicked = st.button(
-        "Scan Inbox",
-        use_container_width=True,
-        type="primary",
-        disabled=not st.session_state.active_account,
-        icon="🔍",
-    )
 
 
 # ---------------------------------------------------------------------------
 # Main content
 # ---------------------------------------------------------------------------
+
+scan_clicked = sidebar_scan
 
 # -- Scan logic --
 if scan_clicked and st.session_state.active_account:
@@ -731,21 +641,22 @@ if scan_clicked and st.session_state.active_account:
                 import time as _time
                 _batch_start = [_time.time()]
 
-                def _progress(done, total):
+                def _progress(done, total, msg=""):
                     now = _time.time()
                     if done > 0:
                         _batch_times.append(now - _batch_start[0])
                     _batch_start[0] = now
 
-                    if total > 1 and done < total:
+                    if done < total:
                         avg = sum(_batch_times) / len(_batch_times) if _batch_times else 0
                         remaining = int(avg * (total - done))
-                        eta = f" · ~{remaining}s left" if remaining > 0 else ""
+                        eta = f" · ~{remaining}s left" if remaining > 0 and _batch_times else ""
+                        label = msg or f"Step {done}/{total}"
                         progress_placeholder.progress(
-                            done / total,
-                            text=f"Batch {done}/{total}{eta}"
+                            max(done / total, 0.01),
+                            text=f"{label}{eta}"
                         )
-                    elif done == total:
+                    else:
                         progress_placeholder.progress(1.0, text="Done!")
 
                 categorized, cat_actions = categorize(
@@ -789,7 +700,7 @@ if not categorized and not st.session_state.scan_running:
         <div class="hero">
             <div class="hero-icon">🔍</div>
             <h2>Ready to organize</h2>
-            <p>Click <b>Scan Inbox</b> in the sidebar to fetch
+            <p>Hit <b>Scan Inbox</b> in the sidebar to fetch
             and categorize your emails.</p>
         </div>
         """, unsafe_allow_html=True)
@@ -820,7 +731,6 @@ elif categorized:
 
         action_labels = {"keep": "📌 Keep", "archive": "📦 Archive", "trash": "🗑️ Trash"}
 
-        # Render cards as Streamlit buttons in a grid
         cols_per_row = 4
         for row_start in range(0, len(cat_order), cols_per_row):
             row_cats = cat_order[row_start:row_start + cols_per_row]
@@ -832,24 +742,17 @@ elif categorized:
                     count = len(groups[cat_name])
                     action = cat_actions.get(cat_name, infer_action(cat_name))
                     action_str = action_labels.get(action, "")
+                    label = f"{icon}  {count}\n{cat_name}\n{action_str}"
 
-                    st.markdown(
-                        f'<div class="cat-card" style="pointer-events:none;">'
-                        f'<div class="cat-stripe" style="background:{color};"></div>'
-                        f'<div class="cat-icon">{icon}</div>'
-                        f'<div class="cat-count" style="color:{color};">{count}</div>'
-                        f'<div class="cat-name">{_esc(cat_name)}</div>'
-                        f'<div class="cat-action">{action_str}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown('<div class="cat-btn-wrap">', unsafe_allow_html=True)
                     if st.button(
-                        f"View {count} emails",
+                        label,
                         key=f"view_{_cat_key(cat_name)}",
                         use_container_width=True,
                     ):
                         st.session_state.active_category = cat_name
                         st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── DETAIL VIEW ── emails in the selected category
     else:
@@ -864,140 +767,146 @@ elif categorized:
         selected = _get_selected(cat_name)
         action_labels = {"keep": "📌 Keep in inbox", "archive": "📦 Archive", "trash": "🗑️ Trash"}
 
-        # Back button + header
-        if st.button("← Back to categories", key="back_btn"):
+        # Back button
+        if st.button("Back to categories", key="back_btn", icon="⬅️"):
             st.session_state.active_category = None
             st.rerun()
 
-        action_bg = {
-            "keep": "rgba(74,144,217,0.12)",
-            "archive": "rgba(39,174,96,0.12)",
-            "trash": "rgba(231,76,60,0.12)",
-        }
-        st.markdown(
-            f'<div class="detail-header">'
-            f'<span class="dh-icon">{icon}</span>'
-            f'<span class="dh-title">{_esc(cat_name)}</span>'
-            f'<span class="dh-count">{len(cat_emails)} emails</span>'
-            f'<span class="dh-action-badge" style="background:{action_bg.get(action, "var(--bg-card)")}; '
-            f'color:{color};">{action_labels.get(action, "")}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+        # Empty state — all emails processed
+        if not cat_emails:
+            st.markdown(
+                '<div style="text-align:center;padding:60px 20px;">'
+                '<div style="font-size:2rem;margin-bottom:12px;">✅</div>'
+                '<div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">'
+                'All done!</div>'
+                '<div style="font-size:0.85rem;color:var(--text-muted);">'
+                'All emails in this category have been processed.</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
 
-        # Toolbar
-        t1, t2, t3, t4 = st.columns([0.20, 0.20, 0.15, 0.45])
-
-        with t1:
-            st.checkbox(
-                f"Select all ({len(all_ids)})",
-                key=f"sa_{ck}",
-                value=len(selected) == len(all_ids) and len(all_ids) > 0,
-                on_change=_toggle_select_all,
-                args=(cat_name, all_ids),
+            action_bg = {
+                "keep": "rgba(74,144,217,0.12)",
+                "archive": "rgba(39,174,96,0.12)",
+                "trash": "rgba(231,76,60,0.12)",
+            }
+            st.markdown(
+                f'<div class="detail-header">'
+                f'<span class="dh-icon">{icon}</span>'
+                f'<span class="dh-title">{_esc(cat_name)}</span>'
+                f'<span class="dh-count">{len(cat_emails)} emails</span>'
+                f'<span class="dh-action-badge" style="background:{action_bg.get(action, "var(--bg-card)")}; '
+                f'color:{color};">{action_labels.get(action, "")}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
             )
 
-        n_sel = len(selected)
+            # Toolbar
+            n_sel = len(selected)
+            sel_label = f"Select all ({len(all_ids)})" if n_sel == 0 else f"{n_sel} of {len(all_ids)} selected"
+            t1, t2, t3 = st.columns([0.35, 0.20, 0.15])
 
-        with t2:
-            if action in ("trash", "archive"):
-                if st.button("📦 Label & Archive", key=f"la_{ck}",
-                             disabled=n_sel == 0, use_container_width=True):
-                    svc = get_gmail_service(st.session_state.active_account)
-                    apply_label_and_archive(svc, list(selected), label_name)
-                    done_set = set(selected)
-                    st.session_state.categorized = [
-                        ce for ce in st.session_state.categorized
-                        if ce.email.id not in done_set
-                    ]
-                    _set_selected(cat_name, set())
-                    st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
-                    st.rerun()
-            else:
-                if st.button("🏷️ Label", key=f"lbl_{ck}",
-                             disabled=n_sel == 0, use_container_width=True):
-                    svc = get_gmail_service(st.session_state.active_account)
-                    apply_label_keep_inbox(svc, list(selected), label_name)
-                    _set_selected(cat_name, set())
-                    st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
-                    st.rerun()
+            with t1:
+                st.checkbox(
+                    sel_label,
+                    key=f"sa_{ck}",
+                    value=len(selected) == len(all_ids) and len(all_ids) > 0,
+                    on_change=_toggle_select_all,
+                    args=(cat_name, all_ids),
+                )
 
-        with t3:
             trash_confirm_key = f"_ctr_{ck}"
             trash_ids_key = f"_trash_ids_{ck}"
-            if st.button("🗑️ Trash", key=f"tr_{ck}",
-                         disabled=n_sel == 0, use_container_width=True):
-                st.session_state[trash_confirm_key] = True
-                st.session_state[trash_ids_key] = list(selected)
-                st.rerun()
 
-        with t4:
-            if n_sel > 0:
-                st.markdown(
-                    f'<div style="text-align:right;padding-top:6px;font-size:0.82rem;">'
-                    f'<span style="color:var(--accent-light);font-weight:600;">'
-                    f'{n_sel} of {len(all_ids)} selected</span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        # Trash confirmation
-        if st.session_state.get(trash_confirm_key, False):
-            pending_ids = st.session_state.get(trash_ids_key, [])
-            n_pending = len(pending_ids)
-            st.markdown(
-                f'<div class="confirm-banner">'
-                f'<span class="icon">⚠️</span>'
-                f'<span class="msg">Move <b>{n_pending}</b> email{"s" if n_pending != 1 else ""} '
-                f'to trash? Recoverable from Gmail Trash for 30 days.</span>'
-                f'</div>', unsafe_allow_html=True,
-            )
-            cc1, cc2, _ = st.columns([0.15, 0.15, 0.7])
-            with cc1:
-                if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
-                             use_container_width=True):
-                    if pending_ids:
+            with t2:
+                if action in ("trash", "archive"):
+                    if st.button("📦 Label & Archive", key=f"la_{ck}",
+                                 disabled=n_sel == 0, use_container_width=True):
                         svc = get_gmail_service(st.session_state.active_account)
-                        trash_emails(svc, pending_ids)
-                        st.toast(f"Trashed {n_pending} emails", icon="🗑️")
-                        trashed_set = set(pending_ids)
+                        apply_label_and_archive(svc, list(selected), label_name)
+                        done_set = set(selected)
                         st.session_state.categorized = [
                             ce for ce in st.session_state.categorized
-                            if ce.email.id not in trashed_set
+                            if ce.email.id not in done_set
                         ]
-                    st.session_state[trash_confirm_key] = False
-                    st.session_state.pop(trash_ids_key, None)
-                    _set_selected(cat_name, set())
+                        _set_selected(cat_name, set())
+                        st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
+                        st.rerun()
+                else:
+                    if st.button("🏷️ Label", key=f"lbl_{ck}",
+                                 disabled=n_sel == 0, use_container_width=True):
+                        svc = get_gmail_service(st.session_state.active_account)
+                        apply_label_keep_inbox(svc, list(selected), label_name)
+                        _set_selected(cat_name, set())
+                        st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
+                        st.rerun()
+
+            with t3:
+                if st.button("🗑️ Trash", key=f"tr_{ck}",
+                             disabled=n_sel == 0, use_container_width=True):
+                    st.session_state[trash_confirm_key] = True
+                    st.session_state[trash_ids_key] = list(selected)
                     st.rerun()
-            with cc2:
-                if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
-                    st.session_state[trash_confirm_key] = False
-                    st.session_state.pop(trash_ids_key, None)
-                    st.rerun()
 
-        # Email list with checkboxes
-        for ce in cat_emails:
-            eid = ce.email.id
-            chk_key = f"chk_{ck}_{eid}"
-
-            if chk_key not in st.session_state:
-                st.session_state[chk_key] = eid in selected
-            if eid in selected and not st.session_state.get(chk_key, False):
-                st.session_state[chk_key] = True
-            elif eid not in selected and st.session_state.get(chk_key, False):
-                st.session_state[chk_key] = False
-
-            col_chk, col_card = st.columns([0.03, 0.97], gap="small")
-            with col_chk:
-                st.checkbox(
-                    " ",
-                    key=chk_key,
-                    label_visibility="collapsed",
-                    on_change=_toggle_single,
-                    args=(cat_name, eid),
-                )
-            with col_card:
-                current_sel = _get_selected(cat_name)
+            # Trash confirmation
+            if st.session_state.get(trash_confirm_key, False):
+                pending_ids = st.session_state.get(trash_ids_key, [])
+                n_pending = len(pending_ids)
                 st.markdown(
-                    _render_email_list([ce], current_sel),
-                    unsafe_allow_html=True,
+                    f'<div class="confirm-banner">'
+                    f'<span class="icon">⚠️</span>'
+                    f'<span class="msg">Move <b>{n_pending}</b> email{"s" if n_pending != 1 else ""} '
+                    f'to trash? Recoverable from Gmail Trash for 30 days.</span>'
+                    f'</div>', unsafe_allow_html=True,
                 )
+                cc1, cc2, _ = st.columns([0.15, 0.15, 0.7])
+                with cc1:
+                    if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
+                                 use_container_width=True):
+                        if pending_ids:
+                            svc = get_gmail_service(st.session_state.active_account)
+                            trash_emails(svc, pending_ids)
+                            st.toast(f"Trashed {n_pending} emails", icon="🗑️")
+                            trashed_set = set(pending_ids)
+                            st.session_state.categorized = [
+                                ce for ce in st.session_state.categorized
+                                if ce.email.id not in trashed_set
+                            ]
+                        st.session_state[trash_confirm_key] = False
+                        st.session_state.pop(trash_ids_key, None)
+                        _set_selected(cat_name, set())
+                        st.rerun()
+                with cc2:
+                    if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
+                        st.session_state[trash_confirm_key] = False
+                        st.session_state.pop(trash_ids_key, None)
+                        st.rerun()
+
+            # Email list with checkboxes
+            for ce in cat_emails:
+                eid = ce.email.id
+                chk_key = f"chk_{ck}_{eid}"
+
+                if chk_key not in st.session_state:
+                    st.session_state[chk_key] = eid in selected
+                if eid in selected and not st.session_state.get(chk_key, False):
+                    st.session_state[chk_key] = True
+                elif eid not in selected and st.session_state.get(chk_key, False):
+                    st.session_state[chk_key] = False
+
+                col_chk, col_card = st.columns([0.03, 0.97], gap="small")
+                with col_chk:
+                    st.checkbox(
+                        " ",
+                        key=chk_key,
+                        label_visibility="collapsed",
+                        on_change=_toggle_single,
+                        args=(cat_name, eid),
+                    )
+                with col_card:
+                    current_sel = _get_selected(cat_name)
+                    st.markdown(
+                        _render_email_list([ce], current_sel),
+                        unsafe_allow_html=True,
+                    )
