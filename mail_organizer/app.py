@@ -195,65 +195,94 @@ section[data-testid="stSidebar"] [data-testid="stSidebarContent"] {
     margin: 0;
 }
 
-/* ---- Metrics row ---- */
-.metrics {
+/* ---- Category cards grid ---- */
+.cat-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
     margin-bottom: 28px;
 }
-.metric {
+.cat-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 18px 16px;
-    text-align: center;
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    cursor: pointer;
     transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
 }
-.metric:hover {
+.cat-card:hover {
     border-color: var(--border-hover);
-    transform: translateY(-1px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-hover);
+    background: var(--bg-card-hover);
 }
-.metric-num {
-    font-size: 2rem;
+.cat-card .cat-icon {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+}
+.cat-card .cat-count {
+    font-size: 2.2rem;
     font-weight: 800;
     line-height: 1;
     letter-spacing: -1px;
+    margin-bottom: 4px;
 }
-.metric-name {
+.cat-card .cat-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+.cat-card .cat-action {
     font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
     color: var(--text-muted);
-    margin-top: 6px;
+}
+.cat-card .cat-stripe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
 }
 
-/* ---- Tab styling ---- */
-.stTabs [data-baseweb="tab-list"] {
-    gap: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-sm);
-    padding: 4px;
-    border: 1px solid var(--border);
+/* ---- Detail header ---- */
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
 }
-.stTabs [data-baseweb="tab"] {
-    border-radius: var(--radius-xs);
-    padding: 8px 16px;
-    font-size: 0.82rem;
-    font-weight: 600;
+.detail-header .dh-icon {
+    font-size: 1.4rem;
+}
+.detail-header .dh-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.detail-header .dh-count {
+    font-size: 0.85rem;
     color: var(--text-muted);
-    background: transparent;
-    border: none;
+    font-weight: 500;
 }
-.stTabs [aria-selected="true"] {
-    background: rgba(74, 144, 217, 0.15) !important;
-    color: var(--accent-light) !important;
+.detail-header .dh-action-badge {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 4px 12px;
+    border-radius: 20px;
 }
-.stTabs [data-baseweb="tab-highlight"] { display: none; }
-.stTabs [data-baseweb="tab-border"] { display: none; }
+
+/* ---- Hide tabs (not used) ---- */
 
 /* ---- Email list ---- */
 .email-list {
@@ -574,6 +603,8 @@ if "active_account" not in st.session_state:
     )
 if "scan_running" not in st.session_state:
     st.session_state.scan_running = False
+if "active_category" not in st.session_state:
+    st.session_state.active_category = None
 
 
 # ---------------------------------------------------------------------------
@@ -678,7 +709,7 @@ with st.sidebar:
 # -- Scan logic --
 if scan_clicked and st.session_state.active_account:
     st.session_state.scan_running = True
-    # Clear old selections
+    st.session_state.active_category = None
     for key in list(st.session_state.keys()):
         if key.startswith("_sel_") or key.startswith("sa_") or key.startswith("chk_"):
             del st.session_state[key]
@@ -765,8 +796,8 @@ if not categorized and not st.session_state.scan_running:
 
 elif categorized:
     cat_actions = st.session_state.get("cat_actions", {})
+    active_cat = st.session_state.get("active_category")
 
-    # Build ordered category list (keep > archive > trash)
     groups: dict[str, list[CategorizedEmail]] = {}
     for ce in categorized:
         groups.setdefault(ce.category, []).append(ce)
@@ -777,148 +808,196 @@ elif categorized:
         key=lambda c: (order_priority.get(cat_actions.get(c, "keep"), 0), c),
     )
 
-    st.markdown(_render_metrics(categorized, cat_order), unsafe_allow_html=True)
+    # ── SUMMARY VIEW ── clickable category cards
+    if active_cat is None or active_cat not in groups:
+        total = len(categorized)
+        st.markdown(
+            f'<div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:16px;">'
+            f'<b>{total}</b> emails organized into <b>{len(cat_order)}</b> categories '
+            f'— click a category to view</div>',
+            unsafe_allow_html=True,
+        )
 
-    if not cat_order:
-        st.info("No emails to display.")
-    else:
-        tab_labels = []
-        for i, c in enumerate(cat_order):
-            _, icon = get_category_style(c, i)
-            tab_labels.append(f"{icon} {c} ({len(groups[c])})")
-        tabs = st.tabs(tab_labels)
+        action_labels = {"keep": "📌 Keep", "archive": "📦 Archive", "trash": "🗑️ Trash"}
 
-        for tab_idx, (tab, cat_name) in enumerate(zip(tabs, cat_order)):
-            with tab:
-                cat_emails = groups[cat_name]
-                ck = _cat_key(cat_name)
-                action = cat_actions.get(cat_name, infer_action(cat_name))
-                label_name = make_label_name(cat_name)
-                all_ids = [ce.email.id for ce in cat_emails]
-                selected = _get_selected(cat_name)
+        # Render cards as Streamlit buttons in a grid
+        cols_per_row = 4
+        for row_start in range(0, len(cat_order), cols_per_row):
+            row_cats = cat_order[row_start:row_start + cols_per_row]
+            cols = st.columns(cols_per_row)
+            for col_idx, cat_name in enumerate(row_cats):
+                with cols[col_idx]:
+                    cat_idx = cat_order.index(cat_name)
+                    color, icon = get_category_style(cat_name, cat_idx)
+                    count = len(groups[cat_name])
+                    action = cat_actions.get(cat_name, infer_action(cat_name))
+                    action_str = action_labels.get(action, "")
 
-                # Toolbar
-                t1, t2, t3, t4, t5 = st.columns([0.18, 0.20, 0.14, 0.14, 0.34])
-
-                with t1:
-                    st.checkbox(
-                        f"Select all ({len(all_ids)})",
-                        key=f"sa_{ck}",
-                        value=len(selected) == len(all_ids) and len(all_ids) > 0,
-                        on_change=_toggle_select_all,
-                        args=(cat_name, all_ids),
-                    )
-
-                n_sel = len(selected)
-
-                with t2:
-                    if action in ("trash", "archive"):
-                        if st.button("📦 Label & Archive", key=f"la_{ck}",
-                                     disabled=n_sel == 0, use_container_width=True):
-                            svc = get_gmail_service(st.session_state.active_account)
-                            apply_label_and_archive(svc, list(selected), label_name)
-                            done_set = set(selected)
-                            st.session_state.categorized = [
-                                ce for ce in st.session_state.categorized
-                                if ce.email.id not in done_set
-                            ]
-                            _set_selected(cat_name, set())
-                            st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
-                            st.rerun()
-                    else:
-                        if st.button("🏷️ Label", key=f"lbl_{ck}",
-                                     disabled=n_sel == 0, use_container_width=True):
-                            svc = get_gmail_service(st.session_state.active_account)
-                            apply_label_keep_inbox(svc, list(selected), label_name)
-                            _set_selected(cat_name, set())
-                            st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
-                            st.rerun()
-
-                with t3:
-                    trash_confirm_key = f"_ctr_{ck}"
-                    trash_ids_key = f"_trash_ids_{ck}"
-                    if st.button("🗑️ Trash", key=f"tr_{ck}",
-                                 disabled=n_sel == 0, use_container_width=True):
-                        st.session_state[trash_confirm_key] = True
-                        st.session_state[trash_ids_key] = list(selected)
-                        st.rerun()
-
-                with t5:
-                    action_label = {"keep": "📌 Keep in inbox", "archive": "📦 Archive", "trash": "🗑️ Trash"}
-                    color, _ = get_category_style(cat_name, tab_idx)
-                    parts = []
-                    if n_sel > 0:
-                        parts.append(f'<span style="color:var(--accent-light);font-weight:600;">'
-                                     f'{n_sel}/{len(all_ids)} selected</span>')
-                    parts.append(f'<span style="color:{color};font-weight:500;">'
-                                 f'{action_label.get(action, "")}</span>')
                     st.markdown(
-                        f'<div style="text-align:right;padding-top:6px;font-size:0.82rem;">'
-                        f'{" · ".join(parts)}</div>',
+                        f'<div class="cat-card" style="pointer-events:none;">'
+                        f'<div class="cat-stripe" style="background:{color};"></div>'
+                        f'<div class="cat-icon">{icon}</div>'
+                        f'<div class="cat-count" style="color:{color};">{count}</div>'
+                        f'<div class="cat-name">{_esc(cat_name)}</div>'
+                        f'<div class="cat-action">{action_str}</div>'
+                        f'</div>',
                         unsafe_allow_html=True,
                     )
+                    if st.button(
+                        f"View {count} emails",
+                        key=f"view_{_cat_key(cat_name)}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.active_category = cat_name
+                        st.rerun()
 
-                # Trash confirmation
-                trash_confirm_key = f"_ctr_{ck}"
-                trash_ids_key = f"_trash_ids_{ck}"
-                if st.session_state.get(trash_confirm_key, False):
-                    pending_ids = st.session_state.get(trash_ids_key, [])
-                    n_pending = len(pending_ids)
-                    st.markdown(
-                        f'<div class="confirm-banner">'
-                        f'<span class="icon">⚠️</span>'
-                        f'<span class="msg">Move <b>{n_pending}</b> email{"s" if n_pending != 1 else ""} '
-                        f'to trash? Recoverable from Gmail Trash for 30 days.</span>'
-                        f'</div>', unsafe_allow_html=True,
-                    )
-                    cc1, cc2, _ = st.columns([0.15, 0.15, 0.7])
-                    with cc1:
-                        if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
-                                     use_container_width=True):
-                            if pending_ids:
-                                svc = get_gmail_service(st.session_state.active_account)
-                                trash_emails(svc, pending_ids)
-                                st.toast(f"Trashed {n_pending} emails", icon="🗑️")
-                                # Remove trashed emails from results
-                                trashed_set = set(pending_ids)
-                                st.session_state.categorized = [
-                                    ce for ce in st.session_state.categorized
-                                    if ce.email.id not in trashed_set
-                                ]
-                            st.session_state[trash_confirm_key] = False
-                            st.session_state.pop(trash_ids_key, None)
-                            _set_selected(cat_name, set())
-                            st.rerun()
-                    with cc2:
-                        if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
-                            st.session_state[trash_confirm_key] = False
-                            st.session_state.pop(trash_ids_key, None)
-                            st.rerun()
+    # ── DETAIL VIEW ── emails in the selected category
+    else:
+        cat_name = active_cat
+        cat_emails = groups.get(cat_name, [])
+        cat_idx = cat_order.index(cat_name) if cat_name in cat_order else 0
+        ck = _cat_key(cat_name)
+        color, icon = get_category_style(cat_name, cat_idx)
+        action = cat_actions.get(cat_name, infer_action(cat_name))
+        label_name = make_label_name(cat_name)
+        all_ids = [ce.email.id for ce in cat_emails]
+        selected = _get_selected(cat_name)
+        action_labels = {"keep": "📌 Keep in inbox", "archive": "📦 Archive", "trash": "🗑️ Trash"}
 
-                # Email list with checkboxes
-                for ce in cat_emails:
-                    eid = ce.email.id
-                    chk_key = f"chk_{ck}_{eid}"
+        # Back button + header
+        if st.button("← Back to categories", key="back_btn"):
+            st.session_state.active_category = None
+            st.rerun()
 
-                    if chk_key not in st.session_state:
-                        st.session_state[chk_key] = eid in selected
-                    if eid in selected and not st.session_state.get(chk_key, False):
-                        st.session_state[chk_key] = True
-                    elif eid not in selected and st.session_state.get(chk_key, False):
-                        st.session_state[chk_key] = False
+        action_bg = {
+            "keep": "rgba(74,144,217,0.12)",
+            "archive": "rgba(39,174,96,0.12)",
+            "trash": "rgba(231,76,60,0.12)",
+        }
+        st.markdown(
+            f'<div class="detail-header">'
+            f'<span class="dh-icon">{icon}</span>'
+            f'<span class="dh-title">{_esc(cat_name)}</span>'
+            f'<span class="dh-count">{len(cat_emails)} emails</span>'
+            f'<span class="dh-action-badge" style="background:{action_bg.get(action, "var(--bg-card)")}; '
+            f'color:{color};">{action_labels.get(action, "")}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-                    col_chk, col_card = st.columns([0.03, 0.97], gap="small")
-                    with col_chk:
-                        st.checkbox(
-                            " ",
-                            key=chk_key,
-                            label_visibility="collapsed",
-                            on_change=_toggle_single,
-                            args=(cat_name, eid),
-                        )
-                    with col_card:
-                        current_sel = _get_selected(cat_name)
-                        st.markdown(
-                            _render_email_list([ce], current_sel),
-                            unsafe_allow_html=True,
-                        )
+        # Toolbar
+        t1, t2, t3, t4 = st.columns([0.20, 0.20, 0.15, 0.45])
+
+        with t1:
+            st.checkbox(
+                f"Select all ({len(all_ids)})",
+                key=f"sa_{ck}",
+                value=len(selected) == len(all_ids) and len(all_ids) > 0,
+                on_change=_toggle_select_all,
+                args=(cat_name, all_ids),
+            )
+
+        n_sel = len(selected)
+
+        with t2:
+            if action in ("trash", "archive"):
+                if st.button("📦 Label & Archive", key=f"la_{ck}",
+                             disabled=n_sel == 0, use_container_width=True):
+                    svc = get_gmail_service(st.session_state.active_account)
+                    apply_label_and_archive(svc, list(selected), label_name)
+                    done_set = set(selected)
+                    st.session_state.categorized = [
+                        ce for ce in st.session_state.categorized
+                        if ce.email.id not in done_set
+                    ]
+                    _set_selected(cat_name, set())
+                    st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
+                    st.rerun()
+            else:
+                if st.button("🏷️ Label", key=f"lbl_{ck}",
+                             disabled=n_sel == 0, use_container_width=True):
+                    svc = get_gmail_service(st.session_state.active_account)
+                    apply_label_keep_inbox(svc, list(selected), label_name)
+                    _set_selected(cat_name, set())
+                    st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
+                    st.rerun()
+
+        with t3:
+            trash_confirm_key = f"_ctr_{ck}"
+            trash_ids_key = f"_trash_ids_{ck}"
+            if st.button("🗑️ Trash", key=f"tr_{ck}",
+                         disabled=n_sel == 0, use_container_width=True):
+                st.session_state[trash_confirm_key] = True
+                st.session_state[trash_ids_key] = list(selected)
+                st.rerun()
+
+        with t4:
+            if n_sel > 0:
+                st.markdown(
+                    f'<div style="text-align:right;padding-top:6px;font-size:0.82rem;">'
+                    f'<span style="color:var(--accent-light);font-weight:600;">'
+                    f'{n_sel} of {len(all_ids)} selected</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+        # Trash confirmation
+        if st.session_state.get(trash_confirm_key, False):
+            pending_ids = st.session_state.get(trash_ids_key, [])
+            n_pending = len(pending_ids)
+            st.markdown(
+                f'<div class="confirm-banner">'
+                f'<span class="icon">⚠️</span>'
+                f'<span class="msg">Move <b>{n_pending}</b> email{"s" if n_pending != 1 else ""} '
+                f'to trash? Recoverable from Gmail Trash for 30 days.</span>'
+                f'</div>', unsafe_allow_html=True,
+            )
+            cc1, cc2, _ = st.columns([0.15, 0.15, 0.7])
+            with cc1:
+                if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
+                             use_container_width=True):
+                    if pending_ids:
+                        svc = get_gmail_service(st.session_state.active_account)
+                        trash_emails(svc, pending_ids)
+                        st.toast(f"Trashed {n_pending} emails", icon="🗑️")
+                        trashed_set = set(pending_ids)
+                        st.session_state.categorized = [
+                            ce for ce in st.session_state.categorized
+                            if ce.email.id not in trashed_set
+                        ]
+                    st.session_state[trash_confirm_key] = False
+                    st.session_state.pop(trash_ids_key, None)
+                    _set_selected(cat_name, set())
+                    st.rerun()
+            with cc2:
+                if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
+                    st.session_state[trash_confirm_key] = False
+                    st.session_state.pop(trash_ids_key, None)
+                    st.rerun()
+
+        # Email list with checkboxes
+        for ce in cat_emails:
+            eid = ce.email.id
+            chk_key = f"chk_{ck}_{eid}"
+
+            if chk_key not in st.session_state:
+                st.session_state[chk_key] = eid in selected
+            if eid in selected and not st.session_state.get(chk_key, False):
+                st.session_state[chk_key] = True
+            elif eid not in selected and st.session_state.get(chk_key, False):
+                st.session_state[chk_key] = False
+
+            col_chk, col_card = st.columns([0.03, 0.97], gap="small")
+            with col_chk:
+                st.checkbox(
+                    " ",
+                    key=chk_key,
+                    label_visibility="collapsed",
+                    on_change=_toggle_single,
+                    args=(cat_name, eid),
+                )
+            with col_card:
+                current_sel = _get_selected(cat_name)
+                st.markdown(
+                    _render_email_list([ce], current_sel),
+                    unsafe_allow_html=True,
+                )
