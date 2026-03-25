@@ -1,32 +1,36 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-from typing import Any
-
 from mail_organizer.config import KNOWN_PROMO_SENDERS, KNOWN_SOCIAL_SENDERS
-from mail_organizer.models import CategorizedEmail, Category, Email
+from mail_organizer.models import CategorizedEmail, Email
 
-SYSTEM_PROMPT = """You are an email categorization assistant. Classify each email into exactly one category.
+SYSTEM_PROMPT = """You are an expert email organizer. Analyze the emails below and:
 
-Categories:
-- Action Required: emails that need a response or action (meeting invites, questions, requests, approvals)
-- Important: significant emails that should be read but don't require immediate action (updates from boss, financial statements, shipping confirmations for orders)
-- FYI: informational emails worth keeping (team updates, announcements, automated reports)
-- Newsletter: subscription emails, digests, blog updates, weekly roundups
-- Social: notifications from social media platforms (Facebook, LinkedIn, Twitter, Instagram, etc.)
-- Promotions: marketing emails, sales, coupons, product launches, deals
-- Spam: unwanted junk, phishing attempts, scams, unsolicited bulk email
+1. FIRST, define a set of smart categories that naturally fit these emails. Categories should be specific and useful — for example "Amazon Orders", "Banking & Finance", "Work Requests", "Travel", "Newsletters", "Social Media", "Spam" — NOT generic labels. Create between 4 and 12 categories. Always include a "Spam & Junk" category.
 
-Return a JSON object with key "results" containing an array. Each element must have:
-- "id": the email ID (string)
-- "category": one of "Action Required", "Important", "FYI", "Newsletter", "Social", "Promotions", "Spam"
-- "reason": a brief reason for the classification (max 10 words)
+2. THEN, assign every email to exactly one category.
 
-Example: {"results": [{"id": "1", "category": "Action Required", "reason": "Needs approval"}]}
+For each category, also specify an "action":
+- "keep" = important, stays in inbox
+- "archive" = worth keeping but move out of inbox
+- "trash" = junk, delete it
 
-Respond ONLY with valid JSON. No markdown, no explanation."""
+Return a JSON object with this exact structure:
+{
+  "categories": [
+    {"name": "Category Name", "action": "keep|archive|trash"}
+  ],
+  "emails": [
+    {"id": "email_id", "category": "Category Name", "reason": "brief reason (max 8 words)"}
+  ]
+}
+
+Rules:
+- Every email must be assigned to a category
+- Category names in "emails" must exactly match names in "categories"
+- Be specific: "Amazon Orders" is better than "Shopping", "Bank Alerts" is better than "Finance"
+- Respond ONLY with valid JSON. No markdown, no explanation."""
 
 
 def _build_email_prompt(emails: list[Email]) -> str:
@@ -40,9 +44,9 @@ def _build_email_prompt(emails: list[Email]) -> str:
     return "\n".join(lines)
 
 
-def _parse_ai_response(raw: str, emails: list[Email]) -> dict[str, tuple[Category, str]]:
+def _parse_smart_response(raw: str, emails: list[Email]) -> tuple[dict[str, str], list[dict]]:
+    """Returns (category_actions_map, email_assignments)."""
     cleaned = raw.strip()
-    # Strip markdown code fences if present
     if cleaned.startswith("```"):
         cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
         cleaned = re.sub(r"\s*```$", "", cleaned)
@@ -50,38 +54,30 @@ def _parse_ai_response(raw: str, emails: list[Email]) -> dict[str, tuple[Categor
     try:
         parsed = json.loads(cleaned)
     except json.JSONDecodeError:
-        return {}
+        return {}, []
 
-    # Handle both bare arrays and wrapped objects like {"emails": [...]}
-    if isinstance(parsed, list):
-        items = parsed
-    elif isinstance(parsed, dict):
-        for v in parsed.values():
-            if isinstance(v, list):
-                items = v
-                break
-        else:
-            items = [parsed]
-    else:
-        return {}
+    if not isinstance(parsed, dict):
+        return {}, []
 
-    cat_map = {c.value: c for c in Category}
-    result = {}
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        eid = item.get("id", "")
-        cat_str = item.get("category", "")
-        reason = item.get("reason", "")
-        cat = cat_map.get(cat_str, Category.UNCATEGORIZED)
-        result[eid] = (cat, reason)
+    categories_raw = parsed.get("categories", [])
+    emails_raw = parsed.get("emails", parsed.get("results", []))
 
-    return result
+    cat_actions = {}
+    for c in categories_raw:
+        if isinstance(c, dict) and "name" in c:
+            cat_actions[c["name"]] = c.get("action", "keep")
+
+    assignments = []
+    for item in emails_raw:
+        if isinstance(item, dict) and "id" in item:
+            assignments.append(item)
+
+    return cat_actions, assignments
 
 
 def categorize_with_gemini(
     emails: list[Email], api_key: str
-) -> list[CategorizedEmail]:
+) -> tuple[list[CategorizedEmail], dict[str, str]]:
     import google.generativeai as genai
 
     genai.configure(api_key=api_key)
@@ -89,29 +85,20 @@ def categorize_with_gemini(
 
     prompt = _build_email_prompt(emails)
     response = model.generate_content(
-        [
-            {"role": "user", "parts": [SYSTEM_PROMPT + "\n\nEmails:\n" + prompt]},
-        ],
+        [{"role": "user", "parts": [SYSTEM_PROMPT + "\n\nEmails:\n" + prompt]}],
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.2,
         ),
     )
 
-    mapping = _parse_ai_response(response.text, emails)
-    return [
-        CategorizedEmail(
-            email=e,
-            category=mapping.get(e.id, (Category.UNCATEGORIZED, ""))[0],
-            reason=mapping.get(e.id, (Category.UNCATEGORIZED, "No classification"))[1],
-        )
-        for e in emails
-    ]
+    cat_actions, assignments = _parse_smart_response(response.text, emails)
+    return _build_results(emails, cat_actions, assignments)
 
 
 def categorize_with_ollama(
     emails: list[Email], model_name: str = "mistral"
-) -> list[CategorizedEmail]:
+) -> tuple[list[CategorizedEmail], dict[str, str]]:
     import ollama
 
     prompt = _build_email_prompt(emails)
@@ -121,78 +108,91 @@ def categorize_with_ollama(
         model=model_name,
         prompt=full_prompt,
         format="json",
-        options={"temperature": 0.1},
+        options={"temperature": 0.2},
     )
 
     raw = response.response if hasattr(response, "response") else response.get("response", "")
-
-    mapping = _parse_ai_response(raw, emails)
-    return [
-        CategorizedEmail(
-            email=e,
-            category=mapping.get(e.id, (Category.UNCATEGORIZED, ""))[0],
-            reason=mapping.get(e.id, (Category.UNCATEGORIZED, "No classification"))[1],
-        )
-        for e in emails
-    ]
+    cat_actions, assignments = _parse_smart_response(raw, emails)
+    return _build_results(emails, cat_actions, assignments)
 
 
-def categorize_with_rules(emails: list[Email]) -> list[CategorizedEmail]:
+def categorize_with_rules(
+    emails: list[Email],
+) -> tuple[list[CategorizedEmail], dict[str, str]]:
+    cat_actions: dict[str, str] = {}
     results = []
     for e in emails:
-        cat, reason = _apply_rules(e)
+        cat, reason, action = _apply_rules(e)
+        cat_actions[cat] = action
         results.append(CategorizedEmail(email=e, category=cat, reason=reason))
-    return results
+    return results, cat_actions
 
 
-def _apply_rules(e: Email) -> tuple[Category, str]:
+def _apply_rules(e: Email) -> tuple[str, str, str]:
     addr = e.sender_email.lower()
     subject = e.subject.lower()
     snippet = e.snippet.lower()
 
-    # Spam signals
     spam_words = ["winner", "lottery", "urgent action", "act now", "click here",
                   "congratulations", "claim your", "free money"]
     if any(w in subject or w in snippet for w in spam_words):
-        return Category.SPAM, "Spam keywords detected"
+        return "Spam & Junk", "Spam keywords detected", "trash"
 
-    # Newsletter
-    if e.has_unsubscribe:
-        domain = addr.split("@")[-1] if "@" in addr else ""
-        if any(s in addr for s in KNOWN_SOCIAL_SENDERS) or any(
-            s in domain for s in KNOWN_SOCIAL_SENDERS
-        ):
-            return Category.SOCIAL, "Social media notification"
-
-        if any(kw in addr for kw in ["newsletter", "digest", "weekly", "update"]):
-            return Category.NEWSLETTER, "Newsletter sender pattern"
-
-        if any(kw in addr for kw in KNOWN_PROMO_SENDERS):
-            return Category.PROMOTIONS, "Promotional sender pattern"
-
-        return Category.NEWSLETTER, "Has unsubscribe header"
-
-    # Social
     if any(s in addr for s in KNOWN_SOCIAL_SENDERS):
-        return Category.SOCIAL, "Known social media sender"
+        return "Social Media", "Social media notification", "archive"
 
-    # Promotions
-    if any(s in addr for s in KNOWN_PROMO_SENDERS):
-        return Category.PROMOTIONS, "Promotional sender pattern"
-    if any(w in subject for w in ["sale", "% off", "discount", "deal", "coupon", "offer"]):
-        return Category.PROMOTIONS, "Promotional subject keywords"
+    if e.has_unsubscribe:
+        if any(kw in addr for kw in ["newsletter", "digest", "weekly", "update"]):
+            return "Newsletters", "Newsletter sender pattern", "archive"
+        if any(kw in addr for kw in KNOWN_PROMO_SENDERS):
+            return "Promotions & Deals", "Promotional sender", "archive"
+        return "Newsletters", "Has unsubscribe header", "archive"
 
-    # Action required signals
+    if any(kw in addr for kw in KNOWN_PROMO_SENDERS):
+        return "Promotions & Deals", "Promotional sender", "archive"
+    if any(w in subject for w in ["sale", "% off", "discount", "deal", "coupon"]):
+        return "Promotions & Deals", "Promotional keywords", "archive"
+
     action_words = ["please", "action required", "respond", "rsvp", "approve",
                     "review", "confirm", "deadline", "asap", "urgent"]
     if any(w in subject or w in snippet for w in action_words):
-        return Category.ACTION, "Action keywords detected"
+        return "Action Required", "Action keywords detected", "keep"
 
-    # Calendar/meeting
     if any(w in subject for w in ["invitation", "meeting", "invite", "calendar"]):
-        return Category.ACTION, "Meeting or calendar invite"
+        return "Action Required", "Meeting or calendar invite", "keep"
 
-    return Category.UNCATEGORIZED, "No matching rule"
+    if any(w in addr for w in ["amazon", "flipkart", "myntra", "order", "shipping"]):
+        return "Orders & Shipping", "Order-related sender", "keep"
+
+    if any(w in subject for w in ["order", "shipped", "delivered", "tracking"]):
+        return "Orders & Shipping", "Order-related subject", "keep"
+
+    if any(w in addr for w in ["bank", "hdfc", "icici", "sbi", "axis", "paypal", "razorpay"]):
+        return "Banking & Finance", "Financial sender", "keep"
+
+    if any(w in subject for w in ["transaction", "payment", "statement", "balance"]):
+        return "Banking & Finance", "Financial keywords", "keep"
+
+    return "General", "No matching rule", "keep"
+
+
+def _build_results(
+    emails: list[Email],
+    cat_actions: dict[str, str],
+    assignments: list[dict],
+) -> tuple[list[CategorizedEmail], dict[str, str]]:
+    id_map = {item["id"]: item for item in assignments}
+
+    results = []
+    for e in emails:
+        info = id_map.get(e.id, {})
+        cat = info.get("category", "Uncategorized")
+        reason = info.get("reason", "")
+        if cat not in cat_actions:
+            cat_actions[cat] = "keep"
+        results.append(CategorizedEmail(email=e, category=cat, reason=reason))
+
+    return results, cat_actions
 
 
 def categorize(
@@ -200,28 +200,26 @@ def categorize(
     backend: str = "rules",
     gemini_api_key: str = "",
     ollama_model: str = "mistral",
-) -> list[CategorizedEmail]:
+) -> tuple[list[CategorizedEmail], dict[str, str]]:
     if not emails:
-        return []
+        return [], {}
 
     if backend == "gemini" and gemini_api_key:
         try:
             return categorize_with_gemini(emails, gemini_api_key)
         except Exception as exc:
-            return [
-                CategorizedEmail(email=e, category=Category.UNCATEGORIZED,
-                                 reason=f"Gemini error: {exc}")
-                for e in emails
-            ]
+            return (
+                [CategorizedEmail(email=e, category="Error", reason=str(exc)) for e in emails],
+                {"Error": "keep"},
+            )
 
     if backend == "ollama":
         try:
             return categorize_with_ollama(emails, ollama_model)
         except Exception as exc:
-            return [
-                CategorizedEmail(email=e, category=Category.UNCATEGORIZED,
-                                 reason=f"Ollama error: {exc}")
-                for e in emails
-            ]
+            return (
+                [CategorizedEmail(email=e, category="Error", reason=str(exc)) for e in emails],
+                {"Error": "keep"},
+            )
 
     return categorize_with_rules(emails)

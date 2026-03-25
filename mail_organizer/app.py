@@ -14,7 +14,10 @@ from dotenv import load_dotenv
 
 from mail_organizer.auth import add_account, get_gmail_service, list_accounts, remove_account
 from mail_organizer.categorizer import categorize
-from mail_organizer.config import CATEGORY_CONFIG, DEFAULT_MAX_RESULTS, DEFAULT_QUERY
+from mail_organizer.config import (
+    DEFAULT_MAX_RESULTS, DEFAULT_QUERY,
+    get_category_style, infer_action, make_label_name,
+)
 from mail_organizer.gmail_client import (
     apply_label_and_archive,
     apply_label_keep_inbox,
@@ -22,7 +25,7 @@ from mail_organizer.gmail_client import (
     fetch_emails,
     trash_emails,
 )
-from mail_organizer.models import Category, CategorizedEmail
+from mail_organizer.models import CategorizedEmail
 
 load_dotenv()
 
@@ -501,21 +504,19 @@ def _render_email_list(emails: list[CategorizedEmail], selected_set: set[str]) -
     return f'<div class="email-list">{"".join(rows)}</div>'
 
 
-def _render_metrics(categorized: list[CategorizedEmail]) -> str:
-    counts: dict[Category, int] = {}
+def _render_metrics(categorized: list[CategorizedEmail], cat_order: list[str]) -> str:
+    counts: dict[str, int] = {}
     for ce in categorized:
         counts[ce.category] = counts.get(ce.category, 0) + 1
 
     cards = []
-    for cat in Category:
-        if cat == Category.UNCATEGORIZED and cat not in counts:
-            continue
+    for i, cat in enumerate(cat_order):
         n = counts.get(cat, 0)
-        cfg = CATEGORY_CONFIG[cat]
+        color, icon = get_category_style(cat, i)
         cards.append(f"""
         <div class="metric">
-            <div class="metric-num" style="color:{cfg.color};">{n}</div>
-            <div class="metric-name">{cfg.icon} {cat.value}</div>
+            <div class="metric-num" style="color:{color};">{n}</div>
+            <div class="metric-name">{icon} {_esc(cat)}</div>
         </div>""")
 
     return f'<div class="metrics">{"".join(cards)}</div>'
@@ -524,34 +525,38 @@ def _render_metrics(categorized: list[CategorizedEmail]) -> str:
 # ---------------------------------------------------------------------------
 # Selection helpers — proper session_state management
 # ---------------------------------------------------------------------------
-def _sel_key(cat: Category) -> str:
-    return f"_sel_{cat.name}"
+def _cat_key(cat_name: str) -> str:
+    return cat_name.replace(" ", "_").replace("&", "and").replace("/", "_")
 
 
-def _get_selected(cat: Category) -> set[str]:
-    return st.session_state.get(_sel_key(cat), set())
+def _sel_key(cat_name: str) -> str:
+    return f"_sel_{_cat_key(cat_name)}"
 
 
-def _set_selected(cat: Category, ids: set[str]) -> None:
-    st.session_state[_sel_key(cat)] = ids
+def _get_selected(cat_name: str) -> set[str]:
+    return st.session_state.get(_sel_key(cat_name), set())
 
 
-def _toggle_select_all(cat: Category, all_ids: list[str]) -> None:
-    key = f"sa_{cat.name}"
+def _set_selected(cat_name: str, ids: set[str]) -> None:
+    st.session_state[_sel_key(cat_name)] = ids
+
+
+def _toggle_select_all(cat_name: str, all_ids: list[str]) -> None:
+    key = f"sa_{_cat_key(cat_name)}"
     if st.session_state.get(key, False):
-        _set_selected(cat, set(all_ids))
+        _set_selected(cat_name, set(all_ids))
     else:
-        _set_selected(cat, set())
+        _set_selected(cat_name, set())
 
 
-def _toggle_single(cat: Category, email_id: str) -> None:
-    key = f"chk_{cat.name}_{email_id}"
-    current = _get_selected(cat)
+def _toggle_single(cat_name: str, email_id: str) -> None:
+    key = f"chk_{_cat_key(cat_name)}_{email_id}"
+    current = _get_selected(cat_name)
     if st.session_state.get(key, False):
         current.add(email_id)
     else:
         current.discard(email_id)
-    _set_selected(cat, current)
+    _set_selected(cat_name, current)
 
 
 # ---------------------------------------------------------------------------
@@ -559,6 +564,8 @@ def _toggle_single(cat: Category, email_id: str) -> None:
 # ---------------------------------------------------------------------------
 if "categorized" not in st.session_state:
     st.session_state.categorized = []
+if "cat_actions" not in st.session_state:
+    st.session_state.cat_actions = {}
 if "accounts" not in st.session_state:
     st.session_state.accounts = list_accounts()
 if "active_account" not in st.session_state:
@@ -672,8 +679,9 @@ with st.sidebar:
 if scan_clicked and st.session_state.active_account:
     st.session_state.scan_running = True
     # Clear old selections
-    for cat in Category:
-        _set_selected(cat, set())
+    for key in list(st.session_state.keys()):
+        if key.startswith("_sel_") or key.startswith("sa_") or key.startswith("chk_"):
+            del st.session_state[key]
 
     try:
         service = get_gmail_service(st.session_state.active_account)
@@ -686,17 +694,20 @@ if scan_clicked and st.session_state.active_account:
             if emails:
                 engine_name = {"gemini": "Gemini", "ollama": "Ollama", "rules": "rules engine"}
                 st.write(f"Categorizing with **{engine_name[backend_key]}**...")
-                categorized = categorize(
+                categorized, cat_actions = categorize(
                     emails,
                     backend=backend_key,
                     gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
                     ollama_model=ollama_model,
                 )
                 st.session_state.categorized = categorized
-                st.write(f"Categorized **{len(categorized)}** emails")
-                status.update(label=f"Done — {len(categorized)} emails categorized", state="complete")
+                st.session_state.cat_actions = cat_actions
+                n_cats = len(cat_actions)
+                st.write(f"Organized **{len(categorized)}** emails into **{n_cats}** categories")
+                status.update(label=f"Done — {len(categorized)} emails, {n_cats} categories", state="complete")
             else:
                 st.session_state.categorized = []
+                st.session_state.cat_actions = {}
                 status.update(label="No emails matched your query", state="complete")
     except Exception as exc:
         st.error(f"Error: {exc}")
@@ -728,82 +739,96 @@ if not categorized and not st.session_state.scan_running:
         """, unsafe_allow_html=True)
 
 elif categorized:
-    # Header
-    st.markdown(_render_metrics(categorized), unsafe_allow_html=True)
+    cat_actions = st.session_state.get("cat_actions", {})
 
-    # Group by category
-    groups: dict[Category, list[CategorizedEmail]] = {}
+    # Build ordered category list (keep > archive > trash)
+    groups: dict[str, list[CategorizedEmail]] = {}
     for ce in categorized:
         groups.setdefault(ce.category, []).append(ce)
 
-    active_cats = [c for c in Category if c in groups]
-    if not active_cats:
+    order_priority = {"keep": 0, "archive": 1, "trash": 2}
+    cat_order = sorted(
+        groups.keys(),
+        key=lambda c: (order_priority.get(cat_actions.get(c, "keep"), 0), c),
+    )
+
+    st.markdown(_render_metrics(categorized, cat_order), unsafe_allow_html=True)
+
+    if not cat_order:
         st.info("No emails to display.")
     else:
-        tab_labels = [
-            f"{CATEGORY_CONFIG[c].icon} {c.value} ({len(groups[c])})"
-            for c in active_cats
-        ]
+        tab_labels = []
+        for i, c in enumerate(cat_order):
+            _, icon = get_category_style(c, i)
+            tab_labels.append(f"{icon} {c} ({len(groups[c])})")
         tabs = st.tabs(tab_labels)
 
-        for tab, cat in zip(tabs, active_cats):
+        for tab_idx, (tab, cat_name) in enumerate(zip(tabs, cat_order)):
             with tab:
-                cat_emails = groups[cat]
-                cfg = CATEGORY_CONFIG[cat]
+                cat_emails = groups[cat_name]
+                ck = _cat_key(cat_name)
+                action = cat_actions.get(cat_name, infer_action(cat_name))
+                label_name = make_label_name(cat_name)
                 all_ids = [ce.email.id for ce in cat_emails]
-                selected = _get_selected(cat)
+                selected = _get_selected(cat_name)
 
-                # Toolbar row
-                t1, t2, t3, t4, t5 = st.columns([0.18, 0.18, 0.18, 0.18, 0.28])
+                # Toolbar
+                t1, t2, t3, t4, t5 = st.columns([0.18, 0.20, 0.14, 0.14, 0.34])
 
                 with t1:
                     st.checkbox(
                         f"Select all ({len(all_ids)})",
-                        key=f"sa_{cat.name}",
+                        key=f"sa_{ck}",
                         value=len(selected) == len(all_ids) and len(all_ids) > 0,
                         on_change=_toggle_select_all,
-                        args=(cat, all_ids),
+                        args=(cat_name, all_ids),
                     )
 
                 n_sel = len(selected)
 
                 with t2:
-                    if cfg.label_name and not cfg.archive:
-                        if st.button(f"🏷️ Label", key=f"lbl_{cat.name}",
+                    if action == "trash":
+                        if st.button("🏷️ Label & Archive", key=f"la_{ck}",
                                      disabled=n_sel == 0, use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
-                            apply_label_keep_inbox(svc, list(selected), cfg.label_name)
-                            st.toast(f"Labeled {n_sel} emails as {cfg.label_name}", icon="🏷️")
-                    elif cfg.label_name and cfg.archive:
-                        if st.button("📦 Label & Archive", key=f"la_{cat.name}",
+                            apply_label_and_archive(svc, list(selected), label_name)
+                            st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
+                    elif action == "archive":
+                        if st.button("📦 Label & Archive", key=f"la_{ck}",
                                      disabled=n_sel == 0, use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
-                            apply_label_and_archive(svc, list(selected), cfg.label_name)
+                            apply_label_and_archive(svc, list(selected), label_name)
                             st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
                     else:
-                        if st.button("📦 Archive", key=f"ar_{cat.name}",
+                        if st.button("🏷️ Label", key=f"lbl_{ck}",
                                      disabled=n_sel == 0, use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
-                            archive_emails(svc, list(selected))
-                            st.toast(f"Archived {n_sel} emails", icon="📦")
+                            apply_label_keep_inbox(svc, list(selected), label_name)
+                            st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
 
                 with t3:
-                    trash_confirm_key = f"_confirm_trash_{cat.name}"
-                    if st.button("🗑️ Trash", key=f"tr_{cat.name}",
+                    trash_confirm_key = f"_ctr_{ck}"
+                    if st.button("🗑️ Trash", key=f"tr_{ck}",
                                  disabled=n_sel == 0, use_container_width=True):
                         st.session_state[trash_confirm_key] = True
 
                 with t5:
+                    action_label = {"keep": "📌 Keep in inbox", "archive": "📦 Archive", "trash": "🗑️ Trash"}
+                    color, _ = get_category_style(cat_name, tab_idx)
+                    parts = []
                     if n_sel > 0:
-                        st.markdown(
-                            f'<div style="text-align:right;padding-top:6px;">'
-                            f'<span style="font-size:0.82rem;font-weight:600;color:var(--accent-light);">'
-                            f'{n_sel} of {len(all_ids)} selected</span></div>',
-                            unsafe_allow_html=True,
-                        )
+                        parts.append(f'<span style="color:var(--accent-light);font-weight:600;">'
+                                     f'{n_sel}/{len(all_ids)} selected</span>')
+                    parts.append(f'<span style="color:{color};font-weight:500;">'
+                                 f'{action_label.get(action, "")}</span>')
+                    st.markdown(
+                        f'<div style="text-align:right;padding-top:6px;font-size:0.82rem;">'
+                        f'{" · ".join(parts)}</div>',
+                        unsafe_allow_html=True,
+                    )
 
                 # Trash confirmation
-                trash_confirm_key = f"_confirm_trash_{cat.name}"
+                trash_confirm_key = f"_ctr_{ck}"
                 if st.session_state.get(trash_confirm_key, False):
                     st.markdown(
                         f'<div class="confirm-banner">'
@@ -814,28 +839,26 @@ elif categorized:
                     )
                     cc1, cc2, _ = st.columns([0.15, 0.15, 0.7])
                     with cc1:
-                        if st.button("Yes, trash", key=f"yt_{cat.name}", type="primary",
+                        if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
                                      use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
                             trash_emails(svc, list(selected))
                             st.session_state[trash_confirm_key] = False
-                            _set_selected(cat, set())
+                            _set_selected(cat_name, set())
                             st.toast(f"Trashed {n_sel} emails", icon="🗑️")
                             st.rerun()
                     with cc2:
-                        if st.button("Cancel", key=f"ct_{cat.name}", use_container_width=True):
+                        if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
                             st.session_state[trash_confirm_key] = False
                             st.rerun()
 
                 # Email list with checkboxes
                 for ce in cat_emails:
                     eid = ce.email.id
-                    chk_key = f"chk_{cat.name}_{eid}"
+                    chk_key = f"chk_{ck}_{eid}"
 
-                    # Sync checkbox state with selection set
                     if chk_key not in st.session_state:
                         st.session_state[chk_key] = eid in selected
-
                     if eid in selected and not st.session_state.get(chk_key, False):
                         st.session_state[chk_key] = True
                     elif eid not in selected and st.session_state.get(chk_key, False):
@@ -848,10 +871,10 @@ elif categorized:
                             key=chk_key,
                             label_visibility="collapsed",
                             on_change=_toggle_single,
-                            args=(cat, eid),
+                            args=(cat_name, eid),
                         )
                     with col_card:
-                        current_sel = _get_selected(cat)
+                        current_sel = _get_selected(cat_name)
                         st.markdown(
                             _render_email_list([ce], current_sel),
                             unsafe_allow_html=True,

@@ -1,19 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
-
-
-class Category(str, Enum):
-    ACTION = "Action Required"
-    IMPORTANT = "Important"
-    FYI = "FYI"
-    NEWSLETTER = "Newsletter"
-    SOCIAL = "Social"
-    PROMOTIONS = "Promotions"
-    SPAM = "Spam"
-    UNCATEGORIZED = "Uncategorized"
 
 
 @dataclass
@@ -41,8 +28,16 @@ class Email:
 
 
 @dataclass
+class CategoryInfo:
+    name: str
+    label_name: str
+    action: str  # "keep", "archive", "trash"
+    color: str = ""
+    icon: str = ""
+
+
+@dataclass
 class CategorizedEmail:
     email: Email
-    category: Category
+    category: str
     reason: str = ""
-    selected: bool = False
