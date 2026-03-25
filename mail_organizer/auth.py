@@ -29,11 +29,13 @@ def list_accounts() -> list[str]:
     _ensure_tokens_dir()
     accounts = []
     for f in TOKENS_DIR.glob("*.json"):
+        if f.name.startswith("._"):
+            continue
         try:
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
             email = data.get("account_email", f.stem)
             accounts.append(email)
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
             continue
     return sorted(accounts)
 
