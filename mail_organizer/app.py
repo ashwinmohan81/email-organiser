@@ -696,13 +696,26 @@ if scan_clicked and st.session_state.active_account:
                 st.write(f"Categorizing with **{engine_name[backend_key]}**...")
 
                 progress_placeholder = st.empty()
+                _batch_times: list[float] = []
+                import time as _time
+                _batch_start = [_time.time()]
 
                 def _progress(done, total):
-                    if total > 1:
+                    now = _time.time()
+                    if done > 0:
+                        _batch_times.append(now - _batch_start[0])
+                    _batch_start[0] = now
+
+                    if total > 1 and done < total:
+                        avg = sum(_batch_times) / len(_batch_times) if _batch_times else 0
+                        remaining = int(avg * (total - done))
+                        eta = f" · ~{remaining}s left" if remaining > 0 else ""
                         progress_placeholder.progress(
                             done / total,
-                            text=f"Batch {done}/{total} processed..."
+                            text=f"Batch {done}/{total}{eta}"
                         )
+                    elif done == total:
+                        progress_placeholder.progress(1.0, text="Done!")
 
                 categorized, cat_actions = categorize(
                     emails,

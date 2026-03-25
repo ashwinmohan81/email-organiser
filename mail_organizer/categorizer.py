@@ -98,7 +98,7 @@ def categorize_with_gemini(
 
 def categorize_with_ollama(
     emails: list[Email], model_name: str = "mistral",
-    batch_size: int = 10, progress_callback=None,
+    batch_size: int = 5, progress_callback=None,
 ) -> tuple[list[CategorizedEmail], dict[str, str]]:
     import ollama
 
