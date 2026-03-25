@@ -97,23 +97,39 @@ def categorize_with_gemini(
 
 
 def categorize_with_ollama(
-    emails: list[Email], model_name: str = "mistral"
+    emails: list[Email], model_name: str = "mistral",
+    batch_size: int = 10, progress_callback=None,
 ) -> tuple[list[CategorizedEmail], dict[str, str]]:
     import ollama
 
-    prompt = _build_email_prompt(emails)
-    full_prompt = SYSTEM_PROMPT + "\n\nEmails:\n" + prompt
+    all_cat_actions: dict[str, str] = {}
+    all_assignments: list[dict] = []
 
-    response = ollama.generate(
-        model=model_name,
-        prompt=full_prompt,
-        format="json",
-        options={"temperature": 0.2},
-    )
+    batches = [emails[i:i + batch_size] for i in range(0, len(emails), batch_size)]
 
-    raw = response.response if hasattr(response, "response") else response.get("response", "")
-    cat_actions, assignments = _parse_smart_response(raw, emails)
-    return _build_results(emails, cat_actions, assignments)
+    for batch_idx, batch in enumerate(batches):
+        if progress_callback:
+            progress_callback(batch_idx, len(batches))
+
+        prompt = _build_email_prompt(batch)
+        full_prompt = SYSTEM_PROMPT + "\n\nEmails:\n" + prompt
+
+        response = ollama.generate(
+            model=model_name,
+            prompt=full_prompt,
+            format="json",
+            options={"temperature": 0.2},
+        )
+
+        raw = response.response if hasattr(response, "response") else response.get("response", "")
+        cat_actions, assignments = _parse_smart_response(raw, batch)
+        all_cat_actions.update(cat_actions)
+        all_assignments.extend(assignments)
+
+    if progress_callback:
+        progress_callback(len(batches), len(batches))
+
+    return _build_results(emails, all_cat_actions, all_assignments)
 
 
 def categorize_with_rules(
@@ -200,6 +216,7 @@ def categorize(
     backend: str = "rules",
     gemini_api_key: str = "",
     ollama_model: str = "mistral",
+    progress_callback=None,
 ) -> tuple[list[CategorizedEmail], dict[str, str]]:
     if not emails:
         return [], {}
@@ -215,7 +232,10 @@ def categorize(
 
     if backend == "ollama":
         try:
-            return categorize_with_ollama(emails, ollama_model)
+            return categorize_with_ollama(
+                emails, ollama_model,
+                progress_callback=progress_callback,
+            )
         except Exception as exc:
             return (
                 [CategorizedEmail(email=e, category="Error", reason=str(exc)) for e in emails],

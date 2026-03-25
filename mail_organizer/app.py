@@ -694,12 +694,24 @@ if scan_clicked and st.session_state.active_account:
             if emails:
                 engine_name = {"gemini": "Gemini", "ollama": "Ollama", "rules": "rules engine"}
                 st.write(f"Categorizing with **{engine_name[backend_key]}**...")
+
+                progress_placeholder = st.empty()
+
+                def _progress(done, total):
+                    if total > 1:
+                        progress_placeholder.progress(
+                            done / total,
+                            text=f"Batch {done}/{total} processed..."
+                        )
+
                 categorized, cat_actions = categorize(
                     emails,
                     backend=backend_key,
                     gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
                     ollama_model=ollama_model,
+                    progress_callback=_progress,
                 )
+                progress_placeholder.empty()
                 st.session_state.categorized = categorized
                 st.session_state.cat_actions = cat_actions
                 n_cats = len(cat_actions)
