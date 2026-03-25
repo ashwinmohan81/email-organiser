@@ -787,30 +787,36 @@ elif categorized:
                 n_sel = len(selected)
 
                 with t2:
-                    if action == "trash":
-                        if st.button("🏷️ Label & Archive", key=f"la_{ck}",
-                                     disabled=n_sel == 0, use_container_width=True):
-                            svc = get_gmail_service(st.session_state.active_account)
-                            apply_label_and_archive(svc, list(selected), label_name)
-                            st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
-                    elif action == "archive":
+                    if action in ("trash", "archive"):
                         if st.button("📦 Label & Archive", key=f"la_{ck}",
                                      disabled=n_sel == 0, use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
                             apply_label_and_archive(svc, list(selected), label_name)
+                            done_set = set(selected)
+                            st.session_state.categorized = [
+                                ce for ce in st.session_state.categorized
+                                if ce.email.id not in done_set
+                            ]
+                            _set_selected(cat_name, set())
                             st.toast(f"Labeled & archived {n_sel} emails", icon="📦")
+                            st.rerun()
                     else:
                         if st.button("🏷️ Label", key=f"lbl_{ck}",
                                      disabled=n_sel == 0, use_container_width=True):
                             svc = get_gmail_service(st.session_state.active_account)
                             apply_label_keep_inbox(svc, list(selected), label_name)
+                            _set_selected(cat_name, set())
                             st.toast(f"Labeled {n_sel} emails as {label_name}", icon="🏷️")
+                            st.rerun()
 
                 with t3:
                     trash_confirm_key = f"_ctr_{ck}"
+                    trash_ids_key = f"_trash_ids_{ck}"
                     if st.button("🗑️ Trash", key=f"tr_{ck}",
                                  disabled=n_sel == 0, use_container_width=True):
                         st.session_state[trash_confirm_key] = True
+                        st.session_state[trash_ids_key] = list(selected)
+                        st.rerun()
 
                 with t5:
                     action_label = {"keep": "📌 Keep in inbox", "archive": "📦 Archive", "trash": "🗑️ Trash"}
@@ -829,11 +835,14 @@ elif categorized:
 
                 # Trash confirmation
                 trash_confirm_key = f"_ctr_{ck}"
+                trash_ids_key = f"_trash_ids_{ck}"
                 if st.session_state.get(trash_confirm_key, False):
+                    pending_ids = st.session_state.get(trash_ids_key, [])
+                    n_pending = len(pending_ids)
                     st.markdown(
                         f'<div class="confirm-banner">'
                         f'<span class="icon">⚠️</span>'
-                        f'<span class="msg">Move <b>{n_sel}</b> email{"s" if n_sel != 1 else ""} '
+                        f'<span class="msg">Move <b>{n_pending}</b> email{"s" if n_pending != 1 else ""} '
                         f'to trash? Recoverable from Gmail Trash for 30 days.</span>'
                         f'</div>', unsafe_allow_html=True,
                     )
@@ -841,15 +850,24 @@ elif categorized:
                     with cc1:
                         if st.button("Yes, trash", key=f"yt_{ck}", type="primary",
                                      use_container_width=True):
-                            svc = get_gmail_service(st.session_state.active_account)
-                            trash_emails(svc, list(selected))
+                            if pending_ids:
+                                svc = get_gmail_service(st.session_state.active_account)
+                                trash_emails(svc, pending_ids)
+                                st.toast(f"Trashed {n_pending} emails", icon="🗑️")
+                                # Remove trashed emails from results
+                                trashed_set = set(pending_ids)
+                                st.session_state.categorized = [
+                                    ce for ce in st.session_state.categorized
+                                    if ce.email.id not in trashed_set
+                                ]
                             st.session_state[trash_confirm_key] = False
+                            st.session_state.pop(trash_ids_key, None)
                             _set_selected(cat_name, set())
-                            st.toast(f"Trashed {n_sel} emails", icon="🗑️")
                             st.rerun()
                     with cc2:
                         if st.button("Cancel", key=f"ct_{ck}", use_container_width=True):
                             st.session_state[trash_confirm_key] = False
+                            st.session_state.pop(trash_ids_key, None)
                             st.rerun()
 
                 # Email list with checkboxes
